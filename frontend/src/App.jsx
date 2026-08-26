@@ -44,6 +44,7 @@ function App() {
   const isVoiceSpeakingRef = useRef(false);
   const queuedVoiceRef = useRef(null);
   const voiceLoopTimeoutRef = useRef(null);
+  const pendingResetRef = useRef(false);
   const riskDataRef = useRef(null);
 
   // Keep riskDataRef in sync so voice onend callback sees latest level
@@ -386,10 +387,20 @@ function App() {
       isVoiceSpeakingRef.current = false;
       lastSpokenRef.current = tamilText;
 
+      // Handle deferred reset if risk dropped to LOW while we were speaking
+      if (pendingResetRef.current) {
+        pendingResetRef.current = false;
+        lastSpokenRef.current = "";
+        // don't loop after reset
+        return;
+      }
+
       // 1. If a newer alert was queued while we were speaking, play it next (no cancel, just queue)
       if (queuedVoiceRef.current) {
         const next = queuedVoiceRef.current;
         queuedVoiceRef.current = null;
+        // ignore reset marker, already handled
+        if (next === "__RESET__") return;
         voiceLoopTimeoutRef.current = setTimeout(() => speakVoiceLocked(next), 350);
         return;
       }
@@ -418,10 +429,16 @@ function App() {
     utterance.onend = onFinish;
     utterance.onerror = () => {
       isVoiceSpeakingRef.current = false;
+      if (pendingResetRef.current) {
+        pendingResetRef.current = false;
+        lastSpokenRef.current = "";
+        return;
+      }
       // don't auto-retry on error, just allow next trigger
       if (queuedVoiceRef.current) {
         const next = queuedVoiceRef.current;
         queuedVoiceRef.current = null;
+        if (next === "__RESET__") return;
         voiceLoopTimeoutRef.current = setTimeout(() => speakVoiceLocked(next), 350);
       }
     };
@@ -458,17 +475,18 @@ function App() {
         if (!isVoiceSpeakingRef.current && !window.speechSynthesis.speaking) {
           lastSpokenRef.current = "";
         } else {
-          // Defer reset until onend - mark for reset
-          queuedVoiceRef.current = "__RESET__";
+          // Defer reset until onend - mark for reset (don't use queuedVoice, use dedicated flag)
+          pendingResetRef.current = true;
         }
         return;
       }
       return;
     }
 
-      // Handle deferred reset from previous LOW
-      if (queuedVoiceRef.current === "__RESET__" && !isVoiceSpeakingRef.current && !window.speechSynthesis.speaking) {
+      // Handle deferred reset from previous LOW (if we set pending while speaking, wait until finished)
+      if (pendingResetRef.current && !isVoiceSpeakingRef.current && !window.speechSynthesis.speaking) {
         lastSpokenRef.current = "";
+        pendingResetRef.current = false;
         queuedVoiceRef.current = null;
       }
 

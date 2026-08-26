@@ -11,7 +11,7 @@ from collections import defaultdict, deque
 # (MULTI-ELEPHANT VERSION)
 # =========================================================
 
-MODEL_PATH = "yolo11s.pt"  # IMPORTANT: s/m > n recall +15-25% for distant/small elephants. Use "yolo11m.pt" for max accuracy if GPU ok
+MODEL_PATH = "yolo11n.pt"
 VIDEO_PATH = "elephant.mp4"
 
 API_URL = "http://127.0.0.1:8000/api/detection"
@@ -25,16 +25,12 @@ MODE_CHECK_INTERVAL_FRAMES = 10
 VIDEO_STREAM_WIDTH = 640
 VIDEO_JPEG_QUALITY = 65
 
-# ---- HIGH RECALL INFERENCE (tune for distant/small elephants) ----
-IMG_SIZE = 960  # 640 default misses distant elephants; 960-1280 finds them (1280 best but slower). Use 1280 on good GPU.
-IOU_THRESHOLD = 0.45  # NMS IoU - lower keeps more overlapping boxes
-AUGMENT = True  # Test-Time Augmentation - ~3-5% recall boost, ~30% slower
 
 # =========================================================
-# SETTINGS - TUNED FOR MAX ELEPHANT FIND RATE
+# SETTINGS
 # =========================================================
 
-PROCESS_EVERY_N_FRAMES = 2  # was 5 -> processes 2.5x more frames, far fewer missed events
+PROCESS_EVERY_N_FRAMES = 5
 
 # How many recent processed positions we keep PER elephant to
 # judge direction. More than 2 smooths out jitter.
@@ -44,11 +40,11 @@ HISTORY_SIZE = 8
 # independent - fixed pixel thresholds broke on different videos).
 MOVEMENT_THRESHOLD_RATIO = 0.015
 
-CONFIDENCE_THRESHOLD = 0.22  # was 0.30 -> catches weak/distant elephants (0.20-0.25 sweet spot). Lower = more recall, more false positives
+CONFIDENCE_THRESHOLD = 0.30
 
 # Require the same state for 2 processed frames before dashboard update.
 # YOLO detection/tracking/video speed remain unchanged.
-STATE_CONFIRMATION_FRAMES = 2  # was 3 -> faster state flip = quicker dashboard update when elephant appears
+STATE_CONFIRMATION_FRAMES = 3
 
 # COCO class ids we treat as "vehicle" for multi-object detection
 VEHICLE_CLASS_IDS = {2, 3, 5, 7}  # car, motorcycle, bus, truck
@@ -351,9 +347,6 @@ while True:
         persist=True,
         tracker="bytetrack.yaml",
         conf=CONFIDENCE_THRESHOLD,
-        iou=IOU_THRESHOLD,
-        imgsz=IMG_SIZE,
-        augment=AUGMENT,
         verbose=False
     )
 
